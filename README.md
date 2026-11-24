@@ -1,4 +1,6 @@
-# solar-time
+# solartime
+
+`https://pterosdiacos.github.io/solartime/`
 
 A static web app showing **solar time with unequal hours**: each cycle runs from sunset to the next sunset. The night from sunset to sunrise is split into 12 night hours, then the daylight from sunrise to sunset into 12 day hours.
 
@@ -31,7 +33,7 @@ The code is plain ES modules with no build step:
 
 ## Run locally
 
-Browsers won't load ES modules from `file://`, so serve the folder instead:
+Serve the folder instead:
 
 ```sh
 python3 -m http.server 8000
@@ -40,10 +42,4 @@ python3 -m http.server 8000
 
 Geolocation works on `localhost` and over HTTPS.
 
-## Deploy to GitHub Pages
-
-1. Push this repository to GitHub.
-2. Go to **Settings → Pages → Build and deployment**, set **Source** to *Deploy from a branch*, then choose `main` and `/ (root)`.
-3. The site appears at `https://<user>.github.io/solar-time/`.
-
-Your location is used only in your browser. It is stored in `localStorage` so the page can reopen with it, and it is never sent anywhere.
+Your location is used only in your browser. It is never sent anywhere.
