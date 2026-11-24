@@ -1,6 +1,6 @@
 # solartime
 
-`https://pterosdiacos.github.io/solartime/`
+https://pterosdiacos.github.io/solartime/
 
 A static web app showing **solar time with unequal hours**: each cycle runs from sunset to the next sunset. The night from sunset to sunrise is split into 12 night hours, then the daylight from sunrise to sunset into 12 day hours.
 
