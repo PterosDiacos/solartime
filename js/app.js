@@ -92,7 +92,7 @@ const dial = new Dial($('dial'), (info) => {
   if (info) {
     const name = info.phase === 'day' ? 'Day' : 'Night';
     $('hover-info').textContent =
-      `${name} hour ${info.hour} · ${fmtHM(info.start)} – ${fmtHM(info.end)} (${minutes(info.end - info.start)})`;
+      `${name} hour ${info.hour} · ${fmtHM(info.start)} – ${fmtHM(info.end)}`;
   } else {
     showCurrentHourInfo();
   }
@@ -103,7 +103,7 @@ function showCurrentHourInfo() {
   const canHover = window.matchMedia?.('(hover: hover)').matches;
   $('hover-info').textContent = !state.loc
     ? 'Set a location to draw the hours'
-    : canHover ? 'Hover or click an hour to see its end' : 'Tap an hour to see its end';
+    : canHover ? 'Hover or click an hour to see its span' : 'Tap an hour to see its span';
 }
 
 function tick() {

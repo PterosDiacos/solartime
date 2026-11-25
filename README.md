@@ -7,7 +7,7 @@ A static web app showing **solar time with unequal hours**: each cycle runs from
 ## What it shows
 
 - **Readout:** the current temporal time (how many unequal hours and minutes have passed since sunrise or sunset), and which hour you're in.
-- **Dial:** day hours climb the left half from sunrise (bottom) to sunset (top); night hours run down the right half from sunset back to sunrise. The hand points at the current moment. Hours 3, 6, 9 and 12 always show their time. Hover over (or tap) any other hour to see its time.
+- **Dial:** day hours climb the left half from sunrise (bottom) to sunset (top); night hours run down the right half from sunset back to sunrise. The hand points at the current moment. Hours 3, 6, 9 and 12 always show their time. Hover over, click or tap any other hour to see its time, and its span (start – end) appears under the dial; click or tap it again, or anywhere else, to hide it.
 - **Calculations:** day of year, local standard time meridian, equation of time, declination, time correction, local solar time, hour angle, solar elevation, night and day length, and how many real minutes one night hour and one day hour last.
 
 Each label marks the moment its hour **ends**, so day 6 is solar noon, day 12 is sunset and night 12 is sunrise.
