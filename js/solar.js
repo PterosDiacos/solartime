@@ -132,8 +132,10 @@ export function phaseAt(now, c) {
  */
 export function instantQuantities(now, lat, lon, tzOffsetMin) {
   const eot = equationOfTime(now);                 // min
-  const lstm = 15 * (tzOffsetMin / 60);            // deg
-  const tc = 4 * (lon - lstm) + eot;               // min
+  // Wrap to (-180, 180]: zones such as UTC+14 put the meridian at 210° E = 150° W.
+  const wrap = (d) => d - 360 * Math.ceil((d - 180) / 360);
+  const lstm = wrap(15 * (tzOffsetMin / 60));      // deg
+  const tc = 4 * wrap(lon - lstm) + eot;           // min
   const localClock = now + tzOffsetMin * MIN_MS;   // local time, as a UTC-based number
   const lst = localClock + tc * MIN_MS;            // local (apparent) solar time (LST)
   const lstHours = (((lst % DAY_MS) + DAY_MS) % DAY_MS) / HOUR_MS;

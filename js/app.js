@@ -1,12 +1,60 @@
 import { cycleAt, phaseAt, instantQuantities, MIN_MS } from './solar.js';
 import { Dial } from './clock.js';
+import tzlookup from './vendor/tz-lookup.js';
 
 const $ = (id) => document.getElementById(id);
 const STORE_KEY = 'solar-time.location';
 
-const hm = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
-const hms = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
-const fmtHM = (t) => hm.format(t);
+// ---------- time zone of the location ----------
+// Every clock time, the UTC offset (and so LSTM and TC) and the day of year use the time zone
+// at the chosen location, looked up offline from its coordinates. The device only supplies "now".
+
+/** Nautical time zone from longitude, used at sea or if the lookup fails. Etc/GMT signs are inverted. */
+function nauticalZone(lon) {
+  const n = Math.round(lon / 15);
+  return n === 0 ? 'Etc/GMT' : `Etc/GMT${n > 0 ? '-' : '+'}${Math.abs(n)}`;
+}
+function zoneFor(lat, lon) {
+  for (const zone of [() => tzlookup(lat, lon), () => nauticalZone(lon)]) {
+    try {
+      const z = zone();
+      new Intl.DateTimeFormat('en-US', { timeZone: z }); // throws if the browser doesn't know it
+      return z;
+    } catch { /* try the next one */ }
+  }
+  return 'UTC';
+}
+
+/** Formatters and calendar helpers bound to one time zone. */
+function zoneClock(timeZone) {
+  const hm = new Intl.DateTimeFormat(undefined, { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  const hms = new Intl.DateTimeFormat(undefined, { timeZone, hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric',
+    hour: 'numeric', minute: 'numeric', second: 'numeric',
+  });
+  const wall = (t) => Object.fromEntries(parts.formatToParts(t).map(({ type, value }) => [type, +value]));
+  return {
+    zone: timeZone,
+    hm: (t) => hm.format(t),
+    hms: (t) => hms.format(t),
+    /** Minutes the zone's clock is ahead of UTC at instant t (DST included). */
+    offset(t) {
+      const p = wall(t);
+      const asUTC = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+      return Math.round((asUTC - Math.floor(t / 1000) * 1000) / MIN_MS);
+    },
+    /** Day of year and year length for the zone's calendar date at instant t. */
+    dayOfYear(t) {
+      const p = wall(t);
+      const doy = Math.round((Date.UTC(p.year, p.month - 1, p.day) - Date.UTC(p.year, 0, 1)) / 86_400_000) + 1;
+      const y = p.year;
+      return { doy, daysInYear: (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 366 : 365 };
+    },
+  };
+}
+
+const fmtHM = (t) => state.clock.hm(t);
 const pad = (n) => String(n).padStart(2, '0');
 const ordinal = (n) => n + (n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th');
 const minutes = (ms) => `${(ms / MIN_MS).toFixed(1)} min`;
@@ -26,7 +74,7 @@ const utcOffset = (min) => {
   return `UTC${min < 0 ? '−' : '+'}${h}${m ? `:${pad(m)}` : ''}`;
 };
 
-const state = { loc: null, cycleKey: null, cycle: null, hovering: false };
+const state = { loc: null, clock: null, cycleKey: null, cycle: null, hovering: false };
 
 // Theme follows the sun: cream "day" palette by day, deep navy "night" palette at night.
 // Until a location is set, the device's dark-mode setting picks the night palette.
@@ -58,21 +106,18 @@ function showCurrentHourInfo() {
 }
 
 function tick() {
-  const now = Date.now();
-  const tz = -new Date(now).getTimezoneOffset();
-  const d = new Date(now);
-  const y = d.getFullYear();
-  const doy = Math.round((Date.UTC(y, d.getMonth(), d.getDate()) - Date.UTC(y, 0, 1)) / 86_400_000) + 1;
-  const daysInYear = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 366 : 365;
-  $('d-doy').textContent = `${doy} of ${daysInYear}`;
   if (!state.loc) return;
-
+  const now = Date.now();
   const { lat, lon } = state.loc;
+  const clock = state.clock;
+  const tz = clock.offset(now); // location's UTC offset, minutes
+  const { doy, daysInYear } = clock.dayOfYear(now);
+  $('d-doy').textContent = `${doy} of ${daysInYear}`;
   const c = cycleAt(now, lat, lon);
   const p = phaseAt(now, c);
   const q = instantQuantities(now, lat, lon, tz);
 
-  const key = `${lat},${lon},${Math.round(c.prevSunset / MIN_MS)},${Math.round(c.sunset / MIN_MS)}`;
+  const key = `${lat},${lon},${clock.zone},${Math.round(c.prevSunset / MIN_MS)},${Math.round(c.sunset / MIN_MS)}`;
   if (key !== state.cycleKey) {
     state.cycleKey = key;
     state.cycle = c;
@@ -91,7 +136,7 @@ function tick() {
   const left = Math.max(0, Math.round((p.hourEnd - now) / MIN_MS));
   $('hour-line').textContent =
     `${ordinal(p.hour)} hour of the ${p.isDay ? 'day' : 'night'} · ends ${fmtHM(p.hourEnd)} (in ${left} min)`;
-  $('d-lst').textContent = hms.format(q.lst - tz * MIN_MS);
+  $('d-lst').textContent = clock.hms(q.lst - tz * MIN_MS);
   $('d-dayhour').textContent = minutes(c.dayHourMs);
   $('d-nighthour').textContent = minutes(c.nightHourMs);
 
@@ -135,12 +180,17 @@ function setStatus(msg, isError = false) {
 
 function setLocation(lat, lon, source) {
   state.loc = { lat, lon, source };
+  state.clock = zoneClock(zoneFor(lat, lon));
   state.cycleKey = null;
   save(state.loc);
   document.body.classList.remove('no-loc');
   $('lat').value = lat.toFixed(4);
   $('lon').value = lon.toFixed(4);
-  setStatus(source === 'device' ? 'Using your device location.' : 'Using the coordinates you entered.');
+  const where = source === 'device' ? 'Using your device location' : 'Using the entered coordinates';
+  const zone = state.clock.zone;
+  // Etc/GMT±n zones (at sea) have inverted signs, so show them as a plain UTC offset.
+  const zoneName = zone.startsWith('Etc/') ? `${utcOffset(state.clock.offset(Date.now()))} (sea)` : zone.replace(/_/g, ' ');
+  setStatus(`${where} · times in ${zoneName}`);
   showCurrentHourInfo();
   tick();
 }

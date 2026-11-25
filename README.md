@@ -12,12 +12,14 @@ A static web app showing **solar time with unequal hours**: each cycle runs from
 
 Each label marks the moment its hour **ends**, so day 6 is solar noon, day 12 is sunset and night 12 is sunrise.
 
+Everything follows the **location**, whether it comes from the device (with permission) or is typed in. Its time zone is looked up offline from the coordinates, and all clock times, the UTC offset (so LSTM and TC) and the day of year use that zone. At sea, the nautical zone (longitude ÷ 15) is used. The device only supplies the current moment.
+
 ## Method
 
 | Quantity | Formula |
 |---|---|
 | Equation of time (EoT) | NOAA fractional-year series (Spencer 1971) |
-| Local standard time meridian | LSTM = 15° × (offset from UTC in hours) |
+| Local standard time meridian | LSTM = 15° × (the location's offset from UTC in hours) |
 | Time correction | TC = 4 min/° × (longitude − LSTM) + EoT |
 | Local solar time | LST = local clock time + TC |
 | Hour angle | HRA = 15° × (LST − 12 h) |
@@ -29,7 +31,8 @@ The code is plain ES modules with no build step:
 
 - `js/solar.js`: the calculations (pure functions)
 - `js/clock.js`: the SVG dial
-- `js/app.js`: location, the 1-second refresh, and the readouts
+- `js/app.js`: location and its time zone, the 1-second refresh, and the readouts
+- `js/vendor/tz-lookup.js`: [@photostructure/tz-lookup](https://github.com/photostructure/tz-lookup) 11.8.0 (CC0), coordinates → time zone, offline
 
 ## Run locally
 
