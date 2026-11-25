@@ -100,9 +100,10 @@ const dial = new Dial($('dial'), (info) => {
 
 function showCurrentHourInfo() {
   if (state.hovering) return;
-  $('hover-info').textContent = state.loc
-    ? 'Hover or tap an hour number to see when it ends'
-    : 'Set a location to draw the hours';
+  const canHover = window.matchMedia?.('(hover: hover)').matches;
+  $('hover-info').textContent = !state.loc
+    ? 'Set a location to draw the hours'
+    : canHover ? 'Hover or click an hour to see its end' : 'Tap an hour to see its end';
 }
 
 function tick() {

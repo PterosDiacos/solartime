@@ -176,13 +176,15 @@ body[data-phase="night"] .badge { background: var(--night-2); color: var(--on-ni
   letter-spacing: 0.04em;
   fill: var(--muted);
 }
-#dial .hr:hover .time,
-#dial .hr:focus-visible .time,
-#dial .hr:focus .time { opacity: 1; }
-#dial .hr:hover .halo,
-#dial .hr:focus .halo { fill: var(--line); }
-#dial .hr:hover .num,
-#dial .hr:focus .num { fill: var(--ink); }
+/* Hovered (mouse) or selected (tap, click, keyboard) hour: show its time and a grey disc.
+   Uses classes set in clock.js rather than :hover/:focus, which stick after a tap on phones. */
+#dial .hr.hovered .time,
+#dial .hr.selected .time { opacity: 1; }
+#dial .hr.hovered .halo,
+#dial .hr.selected .halo { fill: var(--line); }
+#dial .hr.hovered .num,
+#dial .hr.selected .num { fill: var(--ink); }
+#dial .hr:focus-visible .halo { stroke: var(--muted); stroke-width: 1.5; }
 
 /* Current hour: the number sits on a disc in the Day/Night badge colours. */
 #dial .hr .chip { fill: none; pointer-events: none; }

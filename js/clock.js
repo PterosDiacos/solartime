@@ -50,6 +50,12 @@ export class Dial {
   constructor(svg, onHover) {
     this.svg = svg;
     this.onHover = onHover;
+    this.hovered = null;   // label under the mouse (preview only)
+    this.selected = null;  // label picked by tap, click or keyboard; stays until toggled or cleared
+    // Tapping or clicking anywhere outside an hour label clears the selection.
+    document.addEventListener('pointerdown', (e) => {
+      if (this.selected && !e.target.closest?.('#dial .hr')) this.#select(null);
+    });
     this.labels = { day: [], night: [] };
     svg.setAttribute('viewBox', '-52 -22 504 446');
 
@@ -110,13 +116,45 @@ export class Dial {
     const info = () => this.bounds && {
       phase, hour: i, start: this.bounds[phase][i - 1], end: this.bounds[phase][i],
     };
-    const enter = () => this.onHover(info());
-    const leave = () => this.onHover(null);
-    g.addEventListener('pointerenter', enter);
-    g.addEventListener('pointerleave', leave);
-    g.addEventListener('focus', enter);
-    g.addEventListener('blur', leave);
-    return { g, time };
+    const label = { g, time, info };
+    // Mouse: hovering previews an hour. Touch devices send fake enter/leave around each tap, so
+    // only real mouse pointers count as hover.
+    g.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') this.#hover(label); });
+    g.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') this.#hover(null); });
+    // Click or tap toggles the selection: tap once to show, tap again (or anywhere else) to hide.
+    g.addEventListener('click', () => this.#select(this.selected === label ? null : label));
+    // Keyboard: Tab onto an hour selects it, Enter/Space toggles, Esc or tabbing away clears.
+    g.addEventListener('focus', () => { if (g.matches(':focus-visible')) this.#select(label); });
+    g.addEventListener('blur', () => { if (this.selected === label && !g.matches(':hover')) this.#select(null); });
+    g.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.#select(this.selected === label ? null : label); }
+      if (e.key === 'Escape') this.#select(null);
+    });
+    return label;
+  }
+
+  #hover(label) {
+    this.hovered?.g.classList.remove('hovered');
+    this.hovered = label;
+    label?.g.classList.add('hovered');
+    this.#report();
+  }
+
+  #select(label) {
+    this.selected?.g.classList.remove('selected');
+    this.selected = label;
+    label?.g.classList.add('selected');
+    label?.g.setAttribute('aria-pressed', 'true');
+    for (const p of ['day', 'night']) {
+      for (let i = 1; i <= 12; i++) if (this.labels[p][i] !== label) this.labels[p][i].g.setAttribute('aria-pressed', 'false');
+    }
+    this.#report();
+  }
+
+  /** Tell the page which hour to describe: the hovered one, else the selected one, else none. */
+  #report() {
+    const l = this.hovered || this.selected;
+    this.onHover(l ? l.info() : null);
   }
 
   /** Fill in boundary times; label i shows the moment hour i ends (day 6 = noon, day 12 = sunset). */
