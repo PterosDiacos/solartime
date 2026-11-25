@@ -5,6 +5,8 @@
   --muted: #6d6875;
   --line: #e4ded4;
   --accent: #c8741f;
+  --on-day-2: #4a2c05;    /* text on the gold Day badge */
+  --on-night-2: #dfe4ff;  /* text on the navy Night badge */
   --error: #c2412d;
 
   --day-1: #f3a65a;      /* sunrise */
@@ -100,8 +102,8 @@ h1, h2 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
   background: var(--line);
   color: var(--muted);
 }
-body[data-phase="day"] .badge { background: var(--day-2); color: #4a2c05; }
-body[data-phase="night"] .badge { background: var(--night-2); color: #dfe4ff; }
+body[data-phase="day"] .badge { background: var(--day-2); color: var(--on-day-2); }
+body[data-phase="night"] .badge { background: var(--night-2); color: var(--on-night-2); }
 
 .temporal {
   font-size: clamp(2.8rem, 12vw, 4rem);
@@ -159,7 +161,6 @@ body[data-phase="night"] .badge { background: var(--night-2); color: #dfe4ff; }
 #dial .hr.major .num { font-size: 17px; font-weight: 700; }
 #dial .hr.day.major .num { fill: var(--day-ink); }
 #dial .hr.night.major .num { fill: var(--night-ink); }
-#dial .hr.now .num { fill: var(--accent); font-weight: 800; }
 
 #dial .hr .time {
   font-size: 15px;
@@ -182,6 +183,13 @@ body[data-phase="night"] .badge { background: var(--night-2); color: #dfe4ff; }
 #dial .hr:focus .halo { fill: var(--line); }
 #dial .hr:hover .num,
 #dial .hr:focus .num { fill: var(--ink); }
+
+/* Current hour: the number sits on a disc in the Day/Night badge colours. */
+#dial .hr .chip { fill: none; pointer-events: none; }
+#dial .hr.day.now .chip { fill: var(--day-2); }
+#dial .hr.night.now .chip { fill: var(--night-2); }
+#dial .hr.day.now .num { fill: var(--on-day-2); font-weight: 700; }
+#dial .hr.night.now .num { fill: var(--on-night-2); font-weight: 700; }
 
 #dial .hand-line { stroke: var(--hand); stroke-width: 2.5; stroke-linecap: round; }
 #dial .marker {

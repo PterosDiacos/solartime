@@ -92,6 +92,7 @@ export class Dial {
     // Tap/hover target: the whole 15° wedge around this label, from inside the numeral out past the ring.
     el('path', { d: sector(theta - 7.5, theta + 7.5, R_NUM - 18, R_OUT + 8), class: 'hit' }, g);
     el('circle', { cx: nx, cy: ny, r: 13, class: 'halo' }, g);
+    el('circle', { cx: nx, cy: ny, r: 13, class: 'chip' }, g); // filled while this is the current hour
     el('text', { x: nx, y: ny, class: 'num' }, g).textContent = i;
 
     // Time label just outside the band, anchored away from the dial.
