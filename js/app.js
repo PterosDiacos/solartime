@@ -75,7 +75,7 @@ function tick() {
   const left = Math.max(0, Math.round((p.hourEnd - now) / MIN_MS));
   $('hour-line').textContent =
     `${ordinal(p.hour)} hour of the ${p.isDay ? 'day' : 'night'} · ends ${fmtHM(p.hourEnd)} (in ${left} min)`;
-  $('apparent').textContent = hms.format(q.lst - tz * MIN_MS);
+  $('d-lst').textContent = hms.format(q.lst - tz * MIN_MS);
   $('day-len').textContent = minutes(c.dayHourMs);
   $('night-len').textContent = minutes(c.nightHourMs);
 
@@ -158,13 +158,17 @@ $('manual').addEventListener('submit', (e) => {
 });
 
 const saved = load();
-if (saved) setLocation(saved.lat, saved.lon, saved.source);
-else showCurrentHourInfo();
-
-// If permission was already granted earlier, refresh silently without prompting.
-navigator.permissions?.query({ name: 'geolocation' })
-  .then((p) => { if (p.state === 'granted' && saved?.source !== 'manual') requestDeviceLocation(); })
-  .catch(() => {});
+if (saved) {
+  setLocation(saved.lat, saved.lon, saved.source);
+  // If permission was already granted earlier, refresh silently without prompting.
+  navigator.permissions?.query({ name: 'geolocation' })
+    .then((p) => { if (p.state === 'granted' && saved.source !== 'manual') requestDeviceLocation(); })
+    .catch(() => {});
+} else {
+  // First visit: ask for location straight away.
+  showCurrentHourInfo();
+  requestDeviceLocation();
+}
 
 tick();
 setInterval(tick, 1000);

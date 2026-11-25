@@ -16,7 +16,7 @@
       <h1 class="visually-hidden">Solar Time</h1>
     </header>
 
-    <section class="readout" aria-label="Current solar time">
+    <section class="readout" aria-label="Current solar hour">
       <div class="readout-top">
         <span id="phase-badge" class="badge">—</span>
         <span class="temporal"><span id="temporal-hm">--:--</span><span id="temporal-s" class="sec"></span></span>
@@ -53,8 +53,8 @@
       <h2 id="calc-h">Calculations</h2>
       <dl class="grid">
         <div><dt>Day of year</dt><dd id="d-doy">—</dd></div>
-        <div><dt>Apparent solar time</dt><dd id="apparent">—</dd></div>
-        <div><dt>Local standard time meridian</dt><dd id="d-lstm">—</dd></div>
+        <div><dt>Local solar time</dt><dd id="d-lst">—</dd></div>
+        <div><dt>Local std time meridian</dt><dd id="d-lstm">—</dd></div>
         <div><dt>Equation of time</dt><dd id="d-eot">—</dd></div>
         <div><dt>Time correction</dt><dd id="d-tc">—</dd></div>
         <div><dt>Hour angle</dt><dd id="d-hra">—</dd></div>
@@ -68,7 +68,7 @@
     </section>
 
     <footer class="notes">
-      <p>TC = 4·(longitude − LSTM) + EoT; local solar time = clock time + TC; hour angle = 15°·(solar time − 12 h). Sunrise and sunset use the standard 90.833° zenith, which allows for refraction.</p>
+      <p>TC = 4·(longitude − LSTM) + EoT; local solar time = clock time + TC; hour angle = 15°·(local solar time − 12 h). Sunrise and sunset use the standard 90.833° zenith, which allows for refraction.</p>
     </footer>
   </main>
 </body>

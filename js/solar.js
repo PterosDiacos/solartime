@@ -135,9 +135,9 @@ export function instantQuantities(now, lat, lon, tzOffsetMin) {
   const lstm = 15 * (tzOffsetMin / 60);            // deg
   const tc = 4 * (lon - lstm) + eot;               // min
   const localClock = now + tzOffsetMin * MIN_MS;   // local time, as a UTC-based number
-  const lst = localClock + tc * MIN_MS;            // local (apparent) solar time
+  const lst = localClock + tc * MIN_MS;            // local (apparent) solar time (LST)
   const lstHours = (((lst % DAY_MS) + DAY_MS) % DAY_MS) / HOUR_MS;
-  const hra = 15 * (lstHours - 12);                // deg
+  const hra = 15 * (lstHours - 12);                // hour angle, deg
   const decl = declination(now);
   const phi = lat * RAD;
   const elevation = Math.asin(Math.sin(phi) * Math.sin(decl)
