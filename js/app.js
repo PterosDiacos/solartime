@@ -20,9 +20,24 @@ const duration = (ms) => {
   const m = Math.round(ms / MIN_MS);
   return `${Math.floor(m / 60)} h ${pad(m % 60)} min`;
 };
-const utcOffset = (min) => `UTC${min < 0 ? '−' : '+'}${pad(Math.floor(Math.abs(min) / 60))}:${pad(Math.abs(min) % 60)}`;
+// Short UTC offset: UTC+1, UTC−5, UTC+5:30, UTC+0.
+const utcOffset = (min) => {
+  const h = Math.floor(Math.abs(min) / 60), m = Math.abs(min) % 60;
+  return `UTC${min < 0 ? '−' : '+'}${h}${m ? `:${pad(m)}` : ''}`;
+};
 
 const state = { loc: null, cycleKey: null, cycle: null, hovering: false };
+
+// Theme follows the sun: cream "day" palette by day, deep navy "night" palette at night.
+// Until a location is set, the device's dark-mode setting picks the night palette.
+const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)');
+function setTheme(isDay) {
+  const day = isDay == null ? !prefersDark?.matches : isDay;
+  const theme = day ? 'day' : 'night';
+  if (document.documentElement.dataset.theme !== theme) document.documentElement.dataset.theme = theme;
+}
+setTheme(null);
+prefersDark?.addEventListener?.('change', () => { if (!state.loc) setTheme(null); });
 
 const dial = new Dial($('dial'), (info) => {
   state.hovering = !!info;
@@ -69,6 +84,7 @@ function tick() {
   const totalSec = Math.floor(p.hours * 3600);
   const h = Math.floor(totalSec / 3600), m = Math.floor(totalSec / 60) % 60, s = totalSec % 60;
   document.body.dataset.phase = p.isDay ? 'day' : 'night';
+  setTheme(p.isDay);
   $('phase-badge').textContent = p.isDay ? 'Day' : 'Night';
   $('temporal-hm').textContent = `${pad(h)}:${pad(m)}`;
   $('temporal-s').textContent = `:${pad(s)}`;
@@ -76,8 +92,8 @@ function tick() {
   $('hour-line').textContent =
     `${ordinal(p.hour)} hour of the ${p.isDay ? 'day' : 'night'} · ends ${fmtHM(p.hourEnd)} (in ${left} min)`;
   $('d-lst').textContent = hms.format(q.lst - tz * MIN_MS);
-  $('day-len').textContent = minutes(c.dayHourMs);
-  $('night-len').textContent = minutes(c.nightHourMs);
+  $('d-dayhour').textContent = minutes(c.dayHourMs);
+  $('d-nighthour').textContent = minutes(c.nightHourMs);
 
   $('polar').hidden = !c.polar;
   if (c.polar) {
@@ -87,13 +103,14 @@ function tick() {
   }
 
   $('d-eot').textContent = signedMinSec(q.eot);
-  $('d-lstm').textContent = `${Math.abs(q.lstm).toFixed(1)}° ${q.lstm < 0 ? 'W' : 'E'} (${utcOffset(tz)})`;
+  const offset = document.createElement('span');
+  offset.className = 'sub';
+  offset.textContent = utcOffset(tz);
+  $('d-lstm').replaceChildren(`${Math.abs(q.lstm).toFixed(1)}° ${q.lstm < 0 ? 'W' : 'E'} `, offset);
   $('d-tc').textContent = signedMinSec(q.tc);
   $('d-hra').textContent = deg(q.hra);
   $('d-decl').textContent = deg(q.declination);
   $('d-elev').textContent = deg(q.elevation, 1);
-  $('d-noon').textContent = fmtHM(c.noon);
-  $('d-prev').textContent = fmtHM(c.prevSunset);
   $('d-daylen').textContent = duration(c.sunset - c.sunrise);
   $('d-nightlen').textContent = duration(c.sunrise - c.prevSunset);
 }

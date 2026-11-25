@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Solar Time</title>
   <meta name="description" content="A solar clock with unequal hours: twelve night hours from sunset to sunrise, then twelve day hours from sunrise to sunset, for where you are.">
-  <meta name="color-scheme" content="light dark">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2a14 14 0 0 0 0 28z' fill='%23f2b544'/%3E%3Cpath d='M16 2a14 14 0 0 1 0 28z' fill='%23283070'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="css/style.css">
   <script type="module" src="js/app.js"></script>
@@ -22,10 +21,6 @@
         <span class="temporal"><span id="temporal-hm">--:--</span><span id="temporal-s" class="sec"></span></span>
       </div>
       <p id="hour-line" class="hour-line">Set a location to begin</p>
-      <div class="lengths">
-        <div class="len len-day"><span class="k">1 day hour</span><span id="day-len" class="v">—</span></div>
-        <div class="len len-night"><span class="k">1 night hour</span><span id="night-len" class="v">—</span></div>
-      </div>
       <p id="polar" class="polar" hidden></p>
     </section>
 
@@ -38,12 +33,16 @@
       <h2 id="loc-h">Location</h2>
       <form id="manual" class="manual">
         <div class="fields">
-          <label class="field"><input id="lat" type="number" step="any" min="-90" max="90" placeholder="Latitude" aria-label="Latitude, degrees north (negative for south)" required><span>° N</span></label>
-          <label class="field"><input id="lon" type="number" step="any" min="-180" max="180" placeholder="Longitude" aria-label="Longitude, degrees east (negative for west)" required><span>° E</span></label>
+          <label class="field"><input id="lat" type="number" step="any" min="-90" max="90" placeholder="Latitude" aria-label="Latitude, degrees north (negative for south)" required><span class="unit">° N</span></label>
+          <label class="field"><input id="lon" type="number" step="any" min="-180" max="180" placeholder="Longitude" aria-label="Longitude, degrees east (negative for west)" required><span class="unit">° E</span></label>
         </div>
         <div class="actions">
-          <button id="use-location" class="btn" type="button">Use my location</button>
-          <button class="btn btn-quiet" type="submit">Set</button>
+          <button id="use-location" class="btn btn-icon" type="button" aria-label="Use my location" title="Use my location">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.2" class="fill"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/></svg>
+          </button>
+          <button class="btn btn-quiet btn-icon" type="submit" aria-label="Set coordinates" title="Set coordinates">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12.5l5 5 10-11"/></svg>
+          </button>
         </div>
       </form>
       <p id="loc-status" class="status">Stays in this browser; nothing is sent anywhere.</p>
@@ -53,22 +52,22 @@
       <h2 id="calc-h">Calculations</h2>
       <dl class="grid">
         <div><dt>Day of year</dt><dd id="d-doy">—</dd></div>
-        <div><dt>Local solar time</dt><dd id="d-lst">—</dd></div>
         <div><dt>Local std time meridian</dt><dd id="d-lstm">—</dd></div>
         <div><dt>Equation of time</dt><dd id="d-eot">—</dd></div>
-        <div><dt>Time correction</dt><dd id="d-tc">—</dd></div>
-        <div><dt>Hour angle</dt><dd id="d-hra">—</dd></div>
         <div><dt>Declination</dt><dd id="d-decl">—</dd></div>
+        <div><dt>Time correction</dt><dd id="d-tc">—</dd></div>
+        <div><dt>Local solar time</dt><dd id="d-lst">—</dd></div>
+        <div><dt>Hour angle</dt><dd id="d-hra">—</dd></div>
         <div><dt>Solar elevation</dt><dd id="d-elev">—</dd></div>
-        <div><dt>Previous sunset</dt><dd id="d-prev">—</dd></div>
-        <div><dt>Solar noon</dt><dd id="d-noon">—</dd></div>
         <div><dt>Night length</dt><dd id="d-nightlen">—</dd></div>
         <div><dt>Day length</dt><dd id="d-daylen">—</dd></div>
+        <div><dt>Night hour</dt><dd id="d-nighthour">—</dd></div>
+        <div><dt>Day hour</dt><dd id="d-dayhour">—</dd></div>
       </dl>
     </section>
 
     <footer class="notes">
-      <p>TC = 4·(longitude − LSTM) + EoT; local solar time = clock time + TC; hour angle = 15°·(local solar time − 12 h). Sunrise and sunset use the standard 90.833° zenith, which allows for refraction.</p>
+      <p>TC = 4·(longitude − LSTM) + EoT; local solar time = clock time + TC; hour angle = 15°·(local solar time − 12 h). Sunrise and sunset use the standard 90.833° zenith to allow for refraction.</p>
     </footer>
   </main>
 </body>

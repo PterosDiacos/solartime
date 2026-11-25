@@ -5,6 +5,7 @@
   --muted: #6d6875;
   --line: #e4ded4;
   --accent: #c8741f;
+  --error: #c2412d;
 
   --day-1: #f3a65a;      /* sunrise */
   --day-2: #f8d878;      /* noon */
@@ -23,31 +24,31 @@
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0e1016;
-    --surface: #161922;
-    --ink: #ece9f2;
-    --muted: #9b97a7;
-    --line: #2a2e3b;
-    --accent: #f0a755;
+/* Night theme: a deep palette drawn from the dial's midnight navy (not black), the counterpart of
+   the cream day palette above. Applied while the sun is down at the chosen location (setTheme in
+   app.js); before a location is known, the device's dark-mode setting picks it instead. */
+:root[data-theme="night"] {
+  --bg: #1d2349;
+  --surface: #252c59;
+  --ink: #e9ebfa;
+  --muted: #a4aad2;
+  --line: #363f73;
+  --accent: #f3b562;
+  --error: #ff9a85;
 
-    --day-1: #d98a45;
-    --day-2: #e8c25f;
-    --day-3: #d6765d;
-    --night-1: #4a3f8a;
-    --night-2: #19204a;
-    --night-3: #30447e;
-    --day-ink: #f0b46a;
-    --night-ink: #a9b6f2;
+  /* Night half of the ring lifted a little so it stands out from the navy page. */
+  --night-1: #6457b8;
+  --night-2: #2c3880;
+  --night-3: #4660ad;
+  --day-ink: #f3b562;
+  --night-ink: #b7c2f7;
 
-    --face: #161922;
-    --face-inner: #11131a;
-    --hand: #ece9f2;
-    --tick: rgba(255, 255, 255, 0.35);
+  --face: #252c59;
+  --face-inner: #1f264f;
+  --hand: #e9ebfa;
+  --tick: rgba(255, 255, 255, 0.35);
 
-    color-scheme: dark;
-  }
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -112,26 +113,6 @@ body[data-phase="night"] .badge { background: var(--night-2); color: #dfe4ff; }
 .temporal .sec { font-size: 0.45em; color: var(--muted); }
 
 .hour-line { color: var(--ink); font-size: 1rem; margin-top: 2px !important; }
-
-.lengths {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 14px;
-}
-.len {
-  display: flex;
-  flex-direction: column;
-  min-width: 130px;
-  padding: 8px 14px;
-  border-radius: 12px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-top: 3px solid var(--day-2);
-}
-.len-night { border-top-color: var(--night-1); }
-.len .k { font-size: 0.78rem; color: var(--muted); }
-.len .v { font-size: 1.15rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .polar {
   margin-top: 12px !important;
@@ -257,24 +238,62 @@ body.no-loc #dial .hours { opacity: 0.45; }
 .btn:hover { opacity: 0.88; }
 .btn-quiet { background: transparent; color: var(--ink); border-color: var(--line); }
 
-.manual { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
-.fields { display: flex; gap: 14px; flex: 1 1 240px; min-width: 0; }
-.field { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; }
-.actions { display: flex; gap: 8px; }
+/* Two equal coordinate boxes and two icon buttons share one row, down to a 375px-wide phone. */
+.manual { display: flex; align-items: center; gap: 8px; }
+.fields { display: flex; gap: 8px; min-width: 0; flex: 1 1 0; } /* fills the row, pushing the buttons to the right edge */
+.field {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: 1 1 0;   /* zero basis for both, so they always stay equal width */
+  min-width: 0;
+}
+.unit {
+  flex: none;
+  width: 1.7em;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.actions { display: flex; gap: 6px; flex: none; }
 .manual input {
   font: inherit;
-  font-size: 0.88rem;
+  font-size: 16px; /* 16px or larger stops iOS Safari zooming in on focus */
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 6px 10px;
+  padding: 5px 6px;
+  width: 100%;
   min-width: 0;
-  flex: 1;
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
+.manual input::-webkit-inner-spin-button,
+.manual input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+.btn-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+}
+.btn-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.btn-icon svg .fill { fill: currentColor; stroke: none; }
 
 .status { margin: 6px 0 0; font-size: 0.78rem; color: var(--muted); }
-.status.error { color: #c2412d; }
+.status.error { color: var(--error); }
 
 .grid {
   display: grid;
@@ -284,12 +303,18 @@ body.no-loc #dial .hours { opacity: 0.45; }
 }
 .grid dt { font-size: 0.78rem; color: var(--muted); }
 .grid dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.grid dd .sub { font-size: 0.78em; font-weight: 500; color: var(--muted); white-space: nowrap; }
 
 .notes { margin-top: 22px; font-size: 0.82rem; color: var(--muted); }
 .notes p { margin: 0 0 8px; }
 
 @media (max-width: 420px) {
-  .len { min-width: 0; flex: 1; }
+  .location { padding: 12px; }
+  .manual, .fields { gap: 5px; }
+  .field { gap: 2px; }
+  .unit { width: 1.55em; }
+  .actions { gap: 5px; }
+  .manual input { padding: 5px 3px; }
   .grid { gap: 10px 14px; }
   .grid dd { font-size: 0.95rem; }
 }
