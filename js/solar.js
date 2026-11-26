@@ -1,40 +1,48 @@
 // Solar calculations. All instants are epoch milliseconds (UTC).
 // Longitude is degrees east (+) / west (-); latitude degrees north (+) / south (-).
 //
-// Equation of time and declination use the NOAA "fractional year" series
-// (Spencer 1971), accurate to well under a minute. Sunrise/sunset use a
-// zenith of 90.833 deg (atmospheric refraction + solar disc radius), which is
-// what almanacs publish.
+// Equation of time and declination use the NOAA Solar Calculator formulas, from Jean Meeus,
+// "Astronomical Algorithms": declination to about 0.01 deg and equation of time to a few
+// seconds for centuries around 2000. Sunrise/sunset use a zenith of 90.833 deg (atmospheric
+// refraction + solar disc radius), which is what almanacs publish.
 
 const RAD = Math.PI / 180;
 export const MIN_MS = 60_000;
 export const HOUR_MS = 3_600_000;
 export const DAY_MS = 86_400_000;
 const ZENITH = 90.833;
+const JD_UNIX_EPOCH = 2440587.5; // Julian Day of 1970-01-01 00:00 UTC
+const J2000 = 2451545;           // Julian Day of 2000-01-01 12:00 TT
 
-const isLeap = (y) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
-
-/** Fractional year gamma (radians) for an instant. */
-function fractionalYear(t) {
-  const y = new Date(t).getUTCFullYear();
-  const days = isLeap(y) ? 366 : 365;
-  // NOAA: gamma = 2pi/365 * (doy - 1 + (hour - 12) / 24)
-  return ((2 * Math.PI) / days) * ((t - Date.UTC(y, 0, 1)) / DAY_MS - 0.5);
+/** Sun's declination (deg) and equation of time (min) at instant t (NOAA / Meeus). */
+function sunPosition(t) {
+  const T = (t / DAY_MS + JD_UNIX_EPOCH - J2000) / 36525;                     // Julian centuries since J2000
+  const L0 = (280.46646 + T * (36000.76983 + T * 0.0003032)) % 360;           // geometric mean longitude, deg
+  const M = 357.52911 + T * (35999.05029 - 0.0001537 * T);                    // mean anomaly, deg
+  const e = 0.016708634 - T * (0.000042037 + 0.0000001267 * T);               // orbit eccentricity
+  const C = Math.sin(M * RAD) * (1.914602 - T * (0.004817 + 0.000014 * T))    // equation of centre, deg
+    + Math.sin(2 * M * RAD) * (0.019993 - 0.000101 * T)
+    + Math.sin(3 * M * RAD) * 0.000289;
+  const omega = 125.04 - 1934.136 * T;                                        // Moon's node, for nutation
+  const lambda = L0 + C - 0.00569 - 0.00478 * Math.sin(omega * RAD);          // apparent longitude, deg
+  const eps0 = 23 + (26 + (21.448 - T * (46.815 + T * (0.00059 - T * 0.001813))) / 60) / 60;
+  const eps = eps0 + 0.00256 * Math.cos(omega * RAD);                         // obliquity (corrected), deg
+  const decl = Math.asin(Math.sin(eps * RAD) * Math.sin(lambda * RAD)) / RAD;
+  const y = Math.tan((eps / 2) * RAD) ** 2;
+  const eot = (4 / RAD) * (y * Math.sin(2 * L0 * RAD) - 2 * e * Math.sin(M * RAD)
+    + 4 * e * y * Math.sin(M * RAD) * Math.cos(2 * L0 * RAD)
+    - 0.5 * y * y * Math.sin(4 * L0 * RAD) - 1.25 * e * e * Math.sin(2 * M * RAD));
+  return { decl, eot };
 }
 
 /** Equation of time in minutes (apparent minus mean solar time). */
 export function equationOfTime(t) {
-  const g = fractionalYear(t);
-  return 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g)
-    - 0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+  return sunPosition(t).eot;
 }
 
 /** Solar declination in radians. */
 export function declination(t) {
-  const g = fractionalYear(t);
-  return 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g)
-    - 0.006758 * Math.cos(2 * g) + 0.000907 * Math.sin(2 * g)
-    - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+  return sunPosition(t).decl * RAD;
 }
 
 /** Hour angle of sunrise in degrees, or a polar flag when the sun does not cross the horizon. */

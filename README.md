@@ -18,7 +18,7 @@ Everything follows the **location**, whether it comes from the device (with perm
 
 | Quantity | Formula |
 |---|---|
-| Equation of time (EoT) | NOAA fractional-year series (Spencer 1971) |
+| Equation of time (EoT), declination | NOAA Solar Calculator formulas, from Meeus, *Astronomical Algorithms* (EoT to a few seconds, declination to about 0.01°) |
 | Local standard time meridian | LSTM = 15° × (the location's offset from UTC in hours) |
 | Time correction | TC = 4 min/° × (longitude − LSTM) + EoT |
 | Local solar time | LST = local clock time + TC |
@@ -31,7 +31,7 @@ The code is plain ES modules with no build step:
 
 - `js/solar.js`: the calculations (pure functions)
 - `js/clock.js`: the SVG dial
-- `js/app.js`: location and its time zone, the 1-second refresh, and the readouts
+- `js/app.js`: location and its time zone, the readouts (refreshed every real second; the temporal time at every temporal second)
 - `js/vendor/tz-lookup.js`: [@photostructure/tz-lookup](https://github.com/photostructure/tz-lookup) 11.8.0 (CC0), coordinates → time zone, offline
 
 ## Run locally

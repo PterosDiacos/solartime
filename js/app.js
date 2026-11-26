@@ -126,17 +126,14 @@ function tick() {
   }
   dial.setNow(p.position, p.isDay, p.hour);
 
-  // Readout: temporal time = unequal hours elapsed since sunrise (day) or sunset (night).
-  const totalSec = Math.floor(p.hours * 3600);
-  const h = Math.floor(totalSec / 3600), m = Math.floor(totalSec / 60) % 60, s = totalSec % 60;
   document.body.dataset.phase = p.isDay ? 'day' : 'night';
   setTheme(p.isDay);
   $('phase-badge').textContent = p.isDay ? 'Day' : 'Night';
-  $('temporal-hm').textContent = `${pad(h)}:${pad(m)}`;
-  $('temporal-s').textContent = `:${pad(s)}`;
-  const left = Math.max(0, Math.round((p.hourEnd - now) / MIN_MS));
+  // Time left in this hour: whole minutes, switching to a per-second countdown in the last minute.
+  const secLeft = Math.max(0, Math.ceil((p.hourEnd - now) / 1000));
+  const left = secLeft < 60 ? `${secLeft} s` : `${Math.round(secLeft / 60)} min`;
   $('hour-line').textContent =
-    `${ordinal(p.hour)} hour of the ${p.isDay ? 'day' : 'night'} · ends ${fmtHM(p.hourEnd)} (in ${left} min)`;
+    `${ordinal(p.hour)} hour of the ${p.isDay ? 'day' : 'night'} ends ${fmtHM(p.hourEnd)} in ${left}`;
   $('d-lst').textContent = clock.hms(q.lst - tz * MIN_MS);
   $('d-dayhour').textContent = minutes(c.dayHourMs);
   $('d-nighthour').textContent = minutes(c.nightHourMs);
@@ -179,6 +176,26 @@ function setStatus(msg, isError = false) {
   $('loc-status').classList.toggle('error', isError);
 }
 
+// Readout: temporal time = unequal hours elapsed since sunrise (day) or sunset (night).
+// It has its own timer that fires at each temporal second (hour length / 3600: under a real second
+// when day hours are short, over one when they are long), so every value is shown exactly once.
+// Everything else on the page refreshes once per real second in tick().
+let temporalTimer = 0;
+function temporalTick() {
+  clearTimeout(temporalTimer);
+  if (!state.loc) return;
+  const now = Date.now();
+  const p = phaseAt(now, cycleAt(now, state.loc.lat, state.loc.lon));
+  const secLen = p.hourLen / 3600;                        // one temporal second, in ms
+  const totalSec = Math.floor(p.hours * 3600 + 1e-6);
+  const h = Math.floor(totalSec / 3600), m = Math.floor(totalSec / 60) % 60, s = totalSec % 60;
+  $('temporal-hm').textContent = `${pad(h)}:${pad(m)}`;
+  $('temporal-s').textContent = `:${pad(s)}`;
+  const periodStart = p.hourStart - (p.hour - 1) * p.hourLen;
+  const next = periodStart + (totalSec + 1) * secLen;     // next temporal second boundary
+  temporalTimer = setTimeout(temporalTick, Math.max(20, next - now + 5));
+}
+
 function setLocation(lat, lon, source) {
   state.loc = { lat, lon, source };
   state.clock = zoneClock(zoneFor(lat, lon));
@@ -194,6 +211,7 @@ function setLocation(lat, lon, source) {
   setStatus(`${where} · times in ${zoneName}`);
   showCurrentHourInfo();
   tick();
+  temporalTick();
 }
 
 function requestDeviceLocation() {
