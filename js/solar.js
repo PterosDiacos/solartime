@@ -76,11 +76,11 @@ function crossing(a, b, lat, lon) {
 const cache = new Map();
 
 /**
- * Solar day k at a longitude: the solar midnight before it, solar noon, the next solar midnight,
- * whether the sun is up at each (altitude above -0.833°, i.e. refraction and the sun's disc
- * allowed for), and the real sunrise (between midnight and noon) and sunset (between noon and the
- * next midnight). A sunrise or sunset that does not happen is null, and riseStays / setStays say
- * why: 'day' = the sun stays up, 'night' = it stays down. Nothing is invented in its place.
+ * Solar day k at a longitude: the solar midnight before it and solar noon, whether the sun is up
+ * at each (midnightUp, noonUp: altitude above -0.833°, i.e. refraction and the sun's disc allowed
+ * for), and the real sunrise (between that midnight and noon) and sunset (between noon and the
+ * next midnight). A sunrise or sunset that does not happen is null; the up/down flags at the
+ * surrounding midnight and noon say why. Nothing is invented in its place.
  * Up/down at a solar midnight is decided once, so the sunset before it and the sunrise after it
  * always agree.
  * Day k is UTC [k*DAY_MS, (k+1)*DAY_MS) shifted by -lon/15 hours, so this works regardless of
@@ -93,11 +93,9 @@ export function dayEvents(k, lat, lon) {
   const midnight = solarTime(k, lon, 0), noon = solarTime(k, lon, 720), nextMidnight = solarTime(k + 1, lon, 0);
   const midnightUp = up(midnight), noonUp = up(noon), nextMidnightUp = up(nextMidnight);
   const ev = {
-    midnight, noon, nextMidnight, midnightUp, noonUp, nextMidnightUp,
+    midnight, noon, midnightUp, noonUp,
     sunrise: !midnightUp && noonUp ? crossing(midnight, noon, lat, lon) : null,
     sunset: noonUp && !nextMidnightUp ? crossing(noon, nextMidnight, lat, lon) : null,
-    riseStays: !midnightUp && noonUp ? null : midnightUp ? 'day' : 'night',
-    setStays: noonUp && !nextMidnightUp ? null : nextMidnightUp ? 'day' : 'night',
   };
   if (cache.size > 200) cache.clear();
   cache.set(key, ev);

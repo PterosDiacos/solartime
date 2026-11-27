@@ -28,7 +28,6 @@ function zoneFor(lat, lon) {
 /** Formatters and calendar helpers bound to one time zone. */
 function zoneClock(timeZone) {
   const hm = new Intl.DateTimeFormat(undefined, { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
-  const hms = new Intl.DateTimeFormat(undefined, { timeZone, hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric',
     hour: 'numeric', minute: 'numeric', second: 'numeric',
@@ -37,7 +36,6 @@ function zoneClock(timeZone) {
   return {
     zone: timeZone,
     hm: (t) => hm.format(t),
-    hms: (t) => hms.format(t),
     /** Minutes the zone's clock is ahead of UTC at instant t (DST included). */
     offset(t) {
       const p = wall(t);
@@ -58,6 +56,11 @@ const fmtHM = (t) => state.clock.hm(t);
 const pad = (n) => String(n).padStart(2, '0');
 const ordinal = (n) => n + (n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th');
 const minutes = (ms) => `${(ms / MIN_MS).toFixed(1)} min`;
+/** A time of day given in hours (0-24) as hh:mm:ss. */
+const hoursToHMS = (h) => {
+  const s = Math.floor(h * 3600 + 1e-6) % 86400;
+  return `${pad(Math.floor(s / 3600))}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`;
+};
 const signedMinSec = (min) => {
   const s = Math.round(Math.abs(min) * 60);
   const sign = min < 0 ? '−' : '+';
@@ -135,7 +138,10 @@ function tick() {
   const left = secLeft < 60 ? `${secLeft} s` : `${Math.round(secLeft / 60)} min`;
   $('hour-line').textContent =
     `${ordinal(p.hour)} hour of the ${p.isDay ? 'day' : 'night'} ends ${fmtHM(p.hourEnd)} in ${left}`;
-  $('d-lst').textContent = clock.hms(q.lst - tz * MIN_MS);
+  // Local solar time is a time of day, not an instant in the location's zone: format it directly.
+  // (Formatting now + TC with the zone would use the offset at that other instant, which is an
+  // hour off for up to |TC| after a clock change.)
+  $('d-lst').textContent = hoursToHMS(q.lstHours);
   // A missing half: zero during midnight sun / polar night (there really is no night / day);
   // "—" only in the rare normal cycle near a pole where the neighbouring half is unknown.
   const none = c.kind === 'normal' ? '—' : null;
@@ -210,15 +216,21 @@ function setLocation(lat, lon, source) {
   temporalTick();
 }
 
+// Each device request, and each manual entry, takes a new number. A device answer is used only if
+// nothing newer has happened since, so a slow GPS fix cannot overwrite coordinates typed meanwhile.
+let locationRequest = 0;
+
 function requestDeviceLocation() {
   if (!('geolocation' in navigator)) {
     setStatus('This browser cannot share location. Enter coordinates instead.', true);
     return;
   }
+  const id = ++locationRequest;
   setStatus('Waiting for permission…');
   navigator.geolocation.getCurrentPosition(
-    (pos) => setLocation(pos.coords.latitude, pos.coords.longitude, 'device'),
+    (pos) => { if (id === locationRequest) setLocation(pos.coords.latitude, pos.coords.longitude, 'device'); },
     (err) => {
+      if (id !== locationRequest) return;
       const why = err.code === err.PERMISSION_DENIED
         ? 'Location permission was denied.'
         : 'Could not get your location.';
@@ -236,6 +248,7 @@ $('manual').addEventListener('submit', (e) => {
     setStatus('Latitude must be between −90 and 90, longitude between −180 and 180.', true);
     return;
   }
+  locationRequest++; // supersedes any device request still in flight
   setLocation(lat, lon, 'manual');
 });
 
