@@ -23,9 +23,14 @@ Everything follows the **location**, whether it comes from the device (with perm
 | Time correction | TC = 4 min/° × (longitude − LSTM) + EoT |
 | Local solar time | LST = local clock time + TC |
 | Hour angle | HRA = 15° × (LST − 12 h) |
-| Sunrise / sunset | hour angle where the solar zenith is 90.833° (allows for refraction and the sun's disc) |
+| Sunrise / sunset | the moment the solar zenith crosses 90.833° (allows for refraction and the sun's disc); whether the sun is up at each solar noon and midnight decides which sunrises and sunsets happen |
 
-At latitudes where the sun doesn't rise or set (polar night or midnight sun), the app says so and falls back to equal hours centred on solar noon.
+When the sun doesn't set or rise (midnight sun or polar night), no sunrise or sunset is invented; the dial switches to a full-ring clock anchored on solar noon and midnight:
+
+- **Midnight sun:** 12 day hours round the whole ring from solar midnight (bottom) to the next; the 6th hour ends at solar noon (top). It switches on at a sunrise that is followed by no sunset before the next solar midnight, and off at a solar midnight when a sunset comes before the following one.
+- **Polar night:** 12 night hours round the whole ring from solar noon (top) to the next; the 6th hour ends at solar midnight (bottom). It switches on at a sunset that is followed by no sunrise before the next solar noon, and off at a solar noon when a sunrise comes before the following one.
+
+Right after either, the first normal day starts at that solar midnight, or the first night at that solar noon.
 
 The code is plain ES modules with no build step:
 

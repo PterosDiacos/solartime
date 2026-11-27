@@ -66,7 +66,7 @@ const signedMinSec = (min) => {
 const deg = (d, digits = 2) => `${d < 0 ? '−' : ''}${Math.abs(d).toFixed(digits)}°`;
 const duration = (ms) => {
   const m = Math.round(ms / MIN_MS);
-  return `${Math.floor(m / 60)} h ${pad(m % 60)} min`;
+  return `${Math.floor(m / 60)} h ${m % 60} min`;
 };
 // Short UTC offset: UTC+1, UTC−5, UTC+5:30, UTC+0.
 const utcOffset = (min) => {
@@ -118,7 +118,8 @@ function tick() {
   const p = phaseAt(now, c);
   const q = instantQuantities(now, lat, lon, tz);
 
-  const key = `${lat},${lon},${clock.zone},${Math.round(c.prevSunset / MIN_MS)},${Math.round(c.sunset / MIN_MS)}`;
+  const span = (sp) => (sp ? sp.map((t) => Math.round(t / MIN_MS)).join('-') : '');
+  const key = `${lat},${lon},${clock.zone},${c.kind},${span(c.day)},${span(c.night)}`;
   if (key !== state.cycleKey) {
     state.cycleKey = key;
     state.cycle = c;
@@ -135,15 +136,11 @@ function tick() {
   $('hour-line').textContent =
     `${ordinal(p.hour)} hour of the ${p.isDay ? 'day' : 'night'} ends ${fmtHM(p.hourEnd)} in ${left}`;
   $('d-lst').textContent = clock.hms(q.lst - tz * MIN_MS);
-  $('d-dayhour').textContent = minutes(c.dayHourMs);
-  $('d-nighthour').textContent = minutes(c.nightHourMs);
-
-  $('polar').hidden = !c.polar;
-  if (c.polar) {
-    $('polar').textContent = c.polar === 'day'
-      ? 'Midnight sun: the sun does not set today. Showing equal hours around solar noon.'
-      : 'Polar night: the sun does not rise today. Showing equal hours around solar noon.';
-  }
+  // A missing half: zero during midnight sun / polar night (there really is no night / day);
+  // "—" only in the rare normal cycle near a pole where the neighbouring half is unknown.
+  const none = c.kind === 'normal' ? '—' : null;
+  $('d-dayhour').textContent = c.dayHourMs ? minutes(c.dayHourMs) : none ?? minutes(0);
+  $('d-nighthour').textContent = c.nightHourMs ? minutes(c.nightHourMs) : none ?? minutes(0);
 
   $('d-eot').textContent = signedMinSec(q.eot);
   const offset = document.createElement('span');
@@ -154,8 +151,8 @@ function tick() {
   $('d-hra').textContent = deg(q.hra);
   $('d-decl').textContent = deg(q.declination);
   $('d-elev').textContent = deg(q.elevation, 1);
-  $('d-daylen').textContent = duration(c.sunset - c.sunrise);
-  $('d-nightlen').textContent = duration(c.sunrise - c.prevSunset);
+  $('d-daylen').textContent = c.day ? duration(c.day[1] - c.day[0]) : none ?? duration(0);
+  $('d-nightlen').textContent = c.night ? duration(c.night[1] - c.night[0]) : none ?? duration(0);
 }
 
 // ---------- location ----------
@@ -191,8 +188,7 @@ function temporalTick() {
   const h = Math.floor(totalSec / 3600), m = Math.floor(totalSec / 60) % 60, s = totalSec % 60;
   $('temporal-hm').textContent = `${pad(h)}:${pad(m)}`;
   $('temporal-s').textContent = `:${pad(s)}`;
-  const periodStart = p.hourStart - (p.hour - 1) * p.hourLen;
-  const next = periodStart + (totalSec + 1) * secLen;     // next temporal second boundary
+  const next = p.start + (totalSec + 1) * secLen;     // next temporal second boundary
   temporalTimer = setTimeout(temporalTick, Math.max(20, next - now + 5));
 }
 

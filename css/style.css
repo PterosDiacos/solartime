@@ -116,12 +116,6 @@ body[data-phase="night"] .badge { background: var(--night-2); color: var(--on-ni
 
 .hour-line { color: var(--ink); font-size: 0.9rem; margin-top: 2px !important; }
 
-.polar {
-  margin-top: 12px !important;
-  font-size: 0.88rem;
-  color: var(--accent);
-}
-
 /* ---------- dial ---------- */
 
 .dial-wrap { margin: 8px auto 0; max-width: 540px; }

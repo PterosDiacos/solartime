@@ -45,92 +45,196 @@ export function declination(t) {
   return sunPosition(t).decl * RAD;
 }
 
-/** Hour angle of sunrise in degrees, or a polar flag when the sun does not cross the horizon. */
-function sunriseHourAngle(lat, decl) {
-  const phi = Math.max(-89.9999, Math.min(89.9999, lat)) * RAD;
-  const cosH = Math.cos(ZENITH * RAD) / (Math.cos(phi) * Math.cos(decl)) - Math.tan(phi) * Math.tan(decl);
-  if (cosH > 1) return { polar: 'night' };
-  if (cosH < -1) return { polar: 'day' };
-  return { ha: Math.acos(cosH) / RAD };
+/** Sun's altitude (deg, geometric) at instant t, latitude lat and longitude lon. */
+function altitude(t, lat, lon) {
+  const { decl, eot } = sunPosition(t);
+  const utcMin = (((t % DAY_MS) + DAY_MS) % DAY_MS) / MIN_MS;
+  const ha = (utcMin + eot + 4 * lon) / 4 - 180;  // hour angle from true solar time, deg
+  const phi = lat * RAD, d = decl * RAD;
+  return Math.asin(Math.sin(phi) * Math.sin(d) + Math.cos(phi) * Math.cos(d) * Math.cos(ha * RAD)) / RAD;
 }
 
+/** Solar noon (h = 720) or solar midnight (h = 0) of day k: when true solar time reaches h minutes. */
+function solarTime(k, lon, h) {
+  const at = (minutes) => k * DAY_MS + minutes * MIN_MS;
+  let t = at(h - 4 * lon);
+  for (let i = 0; i < 2; i++) t = at(h - 4 * lon - equationOfTime(t));
+  return t;
+}
+
+/** Instant between a and b where the altitude crosses the horizon (bisection; altitude is monotonic there). */
+function crossing(a, b, lat, lon) {
+  const up = (t) => altitude(t, lat, lon) > -(ZENITH - 90);
+  const rising = up(b);
+  for (let i = 0; i < 24; i++) {  // 12 h / 2^24 ≈ 3 ms
+    const m = (a + b) / 2;
+    if (up(m) === rising) b = m; else a = m;
+  }
+  return (a + b) / 2;
+}
+
+const cache = new Map();
+
 /**
- * Sunrise, solar noon and sunset for "local mean solar day" k at a longitude.
- * Day k spans UTC [k*DAY_MS, (k+1)*DAY_MS) shifted by -lon/15 hours, so this
- * works regardless of the browser's time zone.
+ * Solar day k at a longitude: the solar midnight before it, solar noon, the next solar midnight,
+ * whether the sun is up at each (altitude above -0.833°, i.e. refraction and the sun's disc
+ * allowed for), and the real sunrise (between midnight and noon) and sunset (between noon and the
+ * next midnight). A sunrise or sunset that does not happen is null, and riseStays / setStays say
+ * why: 'day' = the sun stays up, 'night' = it stays down. Nothing is invented in its place.
+ * Up/down at a solar midnight is decided once, so the sunset before it and the sunrise after it
+ * always agree.
+ * Day k is UTC [k*DAY_MS, (k+1)*DAY_MS) shifted by -lon/15 hours, so this works regardless of
+ * the browser's time zone.
  */
 export function dayEvents(k, lat, lon) {
-  const base = k * DAY_MS;
-  const at = (minutes) => base + minutes * MIN_MS;
-
-  let noon = at(720 - 4 * lon);
-  for (let i = 0; i < 2; i++) noon = at(720 - 4 * lon - equationOfTime(noon));
-
-  let polar = null;
-  const event = (sign) => {
-    let t = noon + sign * 6 * HOUR_MS;
-    for (let i = 0; i < 3; i++) {
-      const r = sunriseHourAngle(lat, declination(t));
-      if (r.polar) { polar = r.polar; return null; }
-      t = at(720 - 4 * lon - equationOfTime(t) + sign * 4 * r.ha);
-    }
-    return t;
+  const key = `${k},${lat},${lon}`;
+  if (cache.has(key)) return cache.get(key);
+  const up = (t) => altitude(t, lat, lon) > -(ZENITH - 90);
+  const midnight = solarTime(k, lon, 0), noon = solarTime(k, lon, 720), nextMidnight = solarTime(k + 1, lon, 0);
+  const midnightUp = up(midnight), noonUp = up(noon), nextMidnightUp = up(nextMidnight);
+  const ev = {
+    midnight, noon, nextMidnight, midnightUp, noonUp, nextMidnightUp,
+    sunrise: !midnightUp && noonUp ? crossing(midnight, noon, lat, lon) : null,
+    sunset: noonUp && !nextMidnightUp ? crossing(noon, nextMidnight, lat, lon) : null,
+    riseStays: !midnightUp && noonUp ? null : midnightUp ? 'day' : 'night',
+    setStays: noonUp && !nextMidnightUp ? null : nextMidnightUp ? 'day' : 'night',
   };
-  let sunrise = event(-1);
-  let sunset = event(+1);
-  if (sunrise == null || sunset == null) {
-    // Midnight sun / polar night: fall back to equal hours around solar noon.
-    sunrise = noon - 6 * HOUR_MS;
-    sunset = noon + 6 * HOUR_MS;
-  }
-  return { noon, sunrise, sunset, polar };
+  if (cache.size > 200) cache.clear();
+  cache.set(key, ev);
+  return ev;
 }
 
 const bounds = (start, end) => Array.from({ length: 13 }, (_, i) => start + ((end - start) * i) / 12);
 
+function polarCycle(kind, start, end) {
+  const span = [start, end], b = bounds(start, end), hour = (end - start) / 12;
+  return kind === 'polar-day'
+    ? { kind, day: span, night: null, dayBounds: b, nightBounds: null, dayHourMs: hour, nightHourMs: null }
+    : { kind, day: null, night: span, dayBounds: null, nightBounds: b, dayHourMs: null, nightHourMs: hour };
+}
+
 /**
- * The sunset-to-sunset cycle containing `now`:
- * night = previous sunset -> sunrise, day = sunrise -> sunset, each split into 12 hours.
+ * The cycle shown on the dial at instant `now`. Three kinds:
+ *
+ *  - 'polar-day'   (midnight sun): 12 day hours from one solar midnight to the next.
+ *      Switches on at a sunrise that is followed by no sunset before the next solar midnight;
+ *      switches off at a solar midnight when a sunset comes before the following solar midnight.
+ *  - 'polar-night': 12 night hours from one solar noon to the next.
+ *      Switches on at a sunset that is followed by no sunrise before the next solar noon;
+ *      switches off at a solar noon when a sunrise comes before the following solar noon.
+ *  - 'normal': a night (sunset -> sunrise) and a day (sunrise -> sunset), 12 hours each. The half
+ *      that is not current is the previous night (during the day) or the next day (during the
+ *      night). Right after polar time a half starts at the switch-off moment instead: a day from
+ *      the solar midnight, or a night from the solar noon. If the usual neighbour does not exist
+ *      (no night before such a day; no normal day after a sunrise that starts midnight sun), the
+ *      neighbour on the other side is shown.
+ *
+ * Returns { kind, day, night } as [start, end] instants (null when absent), the 13 hour
+ * boundaries of each (dayBounds, nightBounds) and the hour lengths in ms.
  */
 export function cycleAt(now, lat, lon) {
-  let k = Math.floor((now + lon * 4 * MIN_MS) / DAY_MS);
-  let ev = dayEvents(k, lat, lon);
-  for (let guard = 0; now >= ev.sunset && guard < 3; guard++) ev = dayEvents(++k, lat, lon);
-  let prev = dayEvents(k - 1, lat, lon);
-  for (let guard = 0; now < prev.sunset && guard < 3; guard++) {
-    ev = prev;
-    prev = dayEvents(--k - 1, lat, lon);
+  const memo = new Map();
+  const day = (k) => {
+    if (!memo.has(k)) memo.set(k, dayEvents(k, lat, lon));
+    return memo.get(k);
+  };
+  const upAtMidnight = (k) => day(k).midnightUp;  // sun up at the solar midnight before day k
+  const downAtNoon = (k) => !day(k).noonUp;        // sun down at solar noon of day k
+
+  const k0 = Math.floor((now + lon * 4 * MIN_MS) / DAY_MS);
+  let km = k0; // solar day whose midnight-to-midnight span contains now
+  for (let g = 0; g < 3 && now < day(km).midnight; g++) km--;
+  for (let g = 0; g < 3 && now >= day(km + 1).midnight; g++) km++;
+  let kn = k0; // solar day whose noon-to-noon span contains now
+  for (let g = 0; g < 3 && now < day(kn).noon; g++) kn--;
+  for (let g = 0; g < 3 && now >= day(kn + 1).noon; g++) kn++;
+
+  // Polar day, judged on the midnight-to-midnight span.
+  const dm = day(km);
+  const polarDay = upAtMidnight(km)
+    ? dm.sunset == null                                              // stays on: no sunset before next midnight
+    : dm.sunrise != null && dm.sunset == null && now >= dm.sunrise;  // switches on at this sunrise
+  if (polarDay) return polarCycle('polar-day', dm.midnight, day(km + 1).midnight);
+
+  // Polar night, judged on the noon-to-noon span.
+  const dn = day(kn), dn1 = day(kn + 1);
+  const polarNight = downAtNoon(kn)
+    ? dn1.sunrise == null                                             // stays on: no sunrise before next noon
+    : dn.sunset != null && dn1.sunrise == null && now >= dn.sunset;   // switches on at this sunset
+  if (polarNight) return polarCycle('polar-night', dn.noon, dn1.noon);
+
+  // Normal: segment starts are real sunrises/sunsets, plus the switch-off moments above.
+  const marks = [];
+  for (let k = km - 2; k <= km + 3; k++) {
+    const d = day(k);
+    if (d.sunrise != null) marks.push({ t: d.sunrise, type: 'day', real: true });
+    if (d.sunset != null) marks.push({ t: d.sunset, type: 'night', real: true });
+    if (upAtMidnight(k) && d.sunset != null) marks.push({ t: d.midnight, type: 'day', real: false });
+    if (downAtNoon(k) && day(k + 1).sunrise != null) marks.push({ t: d.noon, type: 'night', real: false });
+  }
+  marks.sort((a, b) => a.t - b.t);
+  const nextReal = (after, type) => marks.find((m) => m.t > after && m.type === type && m.real);
+  const prevStart = (before, type) => marks.findLast((m) => m.t < before && m.type === type);
+  const cur = marks.findLast((m) => m.t <= now);
+
+  // The current half always exists. The other half can be missing near the poles, e.g. a single
+  // short night between polar night and polar day; it is then null and drawn without times.
+  const ok = (sp) => (sp[0] != null && sp[1] != null ? sp : null);
+  let dayspan, nightspan;
+  if (cur.type === 'day') {
+    dayspan = [cur.t, nextReal(cur.t, 'night').t];
+    if (cur.real) nightspan = ok([prevStart(cur.t, 'night')?.t, cur.t]);              // previous night
+    else {                                                                            // none before: next night,
+      const set = dayspan[1], rise = nextReal(set, 'day');                           // unless polar night starts
+      let kNoon = km - 1; // first solar noon after that sunset
+      while (day(kNoon).noon <= set) kNoon++;
+      nightspan = !rise || rise.t >= day(kNoon).noon ? null : [set, rise.t];
+    }
+  } else {
+    nightspan = [cur.t, nextReal(cur.t, 'day').t];
+    const rise = nightspan[1];
+    const set = nextReal(rise, 'night');
+    let kAfter = km - 1; // first solar midnight after that sunrise
+    while (day(kAfter).midnight <= rise) kAfter++;
+    const startsPolarDay = !set || set.t >= day(kAfter).midnight;
+    if (!startsPolarDay) dayspan = [rise, set.t];                                     // next day
+    else dayspan = ok([prevStart(cur.t, 'day')?.t, cur.t]);                          // none after: previous day
   }
   return {
-    prevSunset: prev.sunset,
-    sunrise: ev.sunrise,
-    noon: ev.noon,
-    sunset: ev.sunset,
-    polar: ev.polar || prev.polar,
-    dayHourMs: (ev.sunset - ev.sunrise) / 12,
-    nightHourMs: (ev.sunrise - prev.sunset) / 12,
-    dayBounds: bounds(ev.sunrise, ev.sunset),
-    nightBounds: bounds(prev.sunset, ev.sunrise),
+    kind: 'normal',
+    day: dayspan,
+    night: nightspan,
+    dayBounds: dayspan && bounds(...dayspan),
+    nightBounds: nightspan && bounds(...nightspan),
+    dayHourMs: dayspan && (dayspan[1] - dayspan[0]) / 12,
+    nightHourMs: nightspan && (nightspan[1] - nightspan[0]) / 12,
   };
 }
 
-/** Where `now` falls in the cycle: day or night, which hour (1-12), and dial position (0-1). */
+/**
+ * Where `now` falls in the cycle: day or night, which hour (1-12), and dial position (0-1,
+ * clockwise from the bottom). Normal: day fills the left half from the bottom, night the right
+ * half from the top. Polar day: the whole ring from the bottom (solar midnight). Polar night:
+ * the whole ring from the top (solar noon).
+ */
 export function phaseAt(now, c) {
-  const isDay = now >= c.sunrise;
-  const start = isDay ? c.sunrise : c.prevSunset;
-  const end = isDay ? c.sunset : c.sunrise;
+  const isDay = c.kind === 'polar-day' || (c.kind === 'normal' && !!c.day && now >= c.day[0] && now < c.day[1]);
+  const [start, end] = isDay ? c.day : c.night;
   const hourLen = (end - start) / 12;
   const hours = Math.min(12, Math.max(0, (now - start) / hourLen)); // temporal hours elapsed
   const hour = Math.min(12, Math.floor(hours) + 1);
+  const position = c.kind === 'polar-day' ? hours / 12
+    : c.kind === 'polar-night' ? (0.5 + hours / 12) % 1
+    : (isDay ? 0 : 0.5) + hours / 24;
   return {
     isDay,
+    start,
     hours,
     hour,
     hourLen,
     hourStart: start + (hour - 1) * hourLen,
     hourEnd: start + hour * hourLen,
-    // Dial runs clockwise from the bottom: day fills the left half, night the right.
-    position: (isDay ? 0 : 0.5) + hours / 24,
+    position,
   };
 }
 
