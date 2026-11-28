@@ -31,7 +31,7 @@ const LAYOUTS = {
     // Colours follow the hours round the ring: sunrise orange -> noon gold (top) -> sunset coral.
     conic: { start: 0, colors: ['--day-1', '--day-2', '--day-3'] },
     captions: { day: { 6: 'noon' } },
-    names: [['DAY', null]],
+    names: [['DAY', 180]],    // above the hub, towards solar noon
   },
   'polar-night': {
     phases: ['night'],
@@ -39,7 +39,7 @@ const LAYOUTS = {
     // Colours follow the hours round the ring: dusk violet -> midnight navy (bottom) -> dawn blue.
     conic: { start: 180, colors: ['--night-1', '--night-2', '--night-3'] },
     captions: { night: { 6: 'midnight' } },
-    names: [['NIGHT', null]],
+    names: [['NIGHT', 0]],    // below the hub, towards solar midnight
   },
 };
 
@@ -138,7 +138,7 @@ export class Dial {
       el('line', { x1, y1, x2, y2, class: horizon ? 'tick horizon' : 'tick' }, this.ticksG);
     }
     for (const [text, a] of L.names) {
-      const [x, y] = a == null ? [C, C + 58] : pt(a, 58);
+      const [x, y] = pt(a, 58); // 58 units from the centre, at angle a
       el('text', { x, y, class: 'half-name' }, this.namesG).textContent = text;
     }
 
